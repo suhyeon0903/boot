@@ -15,7 +15,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 class PensionData():
     def __init__(self, filepath):
-        self.df = pd.read_csv(os.path.join(filepath), encoding='cp949')
+        self.df = pd.read_csv(filepath, encoding='cp949')
         self.pattern1 = '(\([^)]+\))'
         self.pattern2 = '(\[[^)]+\])'
         self.pattern3 = '[^A-Za-z0-9가-힣]'
@@ -71,83 +71,93 @@ class PensionData():
     def get_data(self):
         return self.df
 
-@ st.cache_data
-def read_pensiondata():
-    data = PensionData('./data/national-pension.csv')
-    return data
+# 제목 추가
+st.title('국민연금 회사 정보 조회')
 
-data = read_pensiondata()
-company_name = st.text_input('회사명을 입력해 주세요', placeholder='검색할 회사명 입력')
+# 파일 업로더
+uploaded_file = st.file_uploader("national-pension.csv 파일을 업로드해주세요", type=['csv'])
 
-if data and company_name:
-    output = data.find_company(company_name=company_name)
-    if len(output) > 0:
-        st.subheader(output.iloc[0]['사업장명'])
-        info = data.company_info(company_name=company_name)
-        st.markdown(
-            f"""
-            - `{info['주소']}`
-            - 업종코드명 `{info['업종코드명']}`
-            - 총 근무자 `{int(info['가입자수']):,}` 명
-            - 신규 입사자 `{info['신규']:,}` 명
-            - 퇴사자 `{info['상실']:,}` 명
-            """
-        )
-        col1, col2, col3 = st.columns(3)
-        col1.text('월급여 추정')
-        col1.markdown(f"`{int(output.iloc[0]['월급여추정']):,}` 원")
+if uploaded_file is not None:
+    @st.cache_data
+    def read_pensiondata(file):
+        data = PensionData(file)
+        return data
 
-        col2.text('연봉 추정')
-        col2.markdown(f"`{int(output.iloc[0]['연간급여추정']):,}` 원")
+    data = read_pensiondata(uploaded_file)
+    
+    company_name = st.text_input('회사명을 입력해 주세요', placeholder='검색할 회사명 입력')
 
-        col3.text('가입자수 추정')
-        col3.markdown(f"`{int(output.iloc[0]['가입자수']):,}` 명")
+    if company_name:
+        output = data.find_company(company_name=company_name)
+        if len(output) > 0:
+            st.subheader(output.iloc[0]['사업장명'])
+            info = data.company_info(company_name=company_name)
+            st.markdown(
+                f"""
+                - `{info['주소']}`
+                - 업종코드명 `{info['업종코드명']}`
+                - 총 근무자 `{int(info['가입자수']):,}` 명
+                - 신규 입사자 `{info['신규']:,}` 명
+                - 퇴사자 `{info['상실']:,}` 명
+                """
+            )
+            col1, col2, col3 = st.columns(3)
+            col1.text('월급여 추정')
+            col1.markdown(f"`{int(output.iloc[0]['월급여추정']):,}` 원")
 
-        st.dataframe(output.round(0), use_container_width=True)
+            col2.text('연봉 추정')
+            col2.markdown(f"`{int(output.iloc[0]['연간급여추정']):,}` 원")
 
-        comp_output = data.compare_company(company_name=company_name)
-        st.dataframe(comp_output.round(0), use_container_width=True)
+            col3.text('가입자수 추정')
+            col3.markdown(f"`{int(output.iloc[0]['가입자수']):,}` 명")
 
-        st.markdown(f'### 업종 평균 VS {company_name} 비교')
+            st.dataframe(output.round(0), use_container_width=True)
 
-        percent_value = info['월급여추정'] / comp_output.iloc[0, 0] * 100 - 100
-        diff_month = abs(comp_output.iloc[0, 0] - info['월급여추정'])
-        diff_year = abs(comp_output.iloc[1, 0] - info['연간급여추정'])
-        upordown = '높은' if percent_value > 0 else '낮은' 
+            comp_output = data.compare_company(company_name=company_name)
+            st.dataframe(comp_output.round(0), use_container_width=True)
 
-        st.markdown(f"""
-        - 업종 **평균 월급여**는 `{int(comp_output.iloc[0, 0]):,}` 원, **평균 연봉**은 `{int(comp_output.iloc[1, 0]):,}` 원 입니다.
-        - `{company_name}`는 평균 보다 `{int(diff_month):,}` 원, :red[약 {percent_value:.2f} %] `{upordown}` `{int(info['월급여추정']):,}` 원을 **월 평균 급여**를 받는 것으로 추정합니다.
-        - `{company_name}`는 평균 보다 `{int(diff_year):,}` 원 `{upordown}` `{int(info['연간급여추정']):,}` 원을 **연봉**을 받는 것으로 추정합니다.
-        """)
+            st.markdown(f'### 업종 평균 VS {company_name} 비교')
 
-        fig, ax = plt.subplots(1, 2)
+            percent_value = info['월급여추정'] / comp_output.iloc[0, 0] * 100 - 100
+            diff_month = abs(comp_output.iloc[0, 0] - info['월급여추정'])
+            diff_year = abs(comp_output.iloc[1, 0] - info['연간급여추정'])
+            upordown = '높은' if percent_value > 0 else '낮은' 
 
-        p1 = ax[0].bar(x=["Average", "Your Company"], height=(comp_output.iloc[0, 0], info['월급여추정']), width=0.7)
-        ax[0].bar_label(p1, fmt='%d')
-        p1[0].set_color('black')
-        p1[1].set_color('red')
-        ax[0].set_title('Monthly Salary')
+            st.markdown(f"""
+            - 업종 **평균 월급여**는 `{int(comp_output.iloc[0, 0]):,}` 원, **평균 연봉**은 `{int(comp_output.iloc[1, 0]):,}` 원 입니다.
+            - `{company_name}`는 평균 보다 `{int(diff_month):,}` 원, :red[약 {percent_value:.2f} %] `{upordown}` `{int(info['월급여추정']):,}` 원을 **월 평균 급여**를 받는 것으로 추정합니다.
+            - `{company_name}`는 평균 보다 `{int(diff_year):,}` 원 `{upordown}` `{int(info['연간급여추정']):,}` 원을 **연봉**을 받는 것으로 추정합니다.
+            """)
 
-        p2 = ax[1].bar(x=["Average", "Your Company"], height=(comp_output.iloc[1, 0], info['연간급여추정']), width=0.7)
-        p2[0].set_color('black')
-        p2[1].set_color('red')
-        ax[1].bar_label(p2, fmt='%d')
-        ax[1].set_title('Yearly Salary')
+            fig, ax = plt.subplots(1, 2)
 
-        ax[0].tick_params(axis='both', which='major', labelsize=8, rotation=0)
-        ax[0].tick_params(axis='both', which='minor', labelsize=6)
-        ax[1].tick_params(axis='both', which='major', labelsize=8)
-        ax[1].tick_params(axis='both', which='minor', labelsize=6)
+            p1 = ax[0].bar(x=["Average", "Your Company"], height=(comp_output.iloc[0, 0], info['월급여추정']), width=0.7)
+            ax[0].bar_label(p1, fmt='%d')
+            p1[0].set_color('black')
+            p1[1].set_color('red')
+            ax[0].set_title('Monthly Salary')
 
-        st.pyplot(fig)
+            p2 = ax[1].bar(x=["Average", "Your Company"], height=(comp_output.iloc[1, 0], info['연간급여추정']), width=0.7)
+            p2[0].set_color('black')
+            p2[1].set_color('red')
+            ax[1].bar_label(p2, fmt='%d')
+            ax[1].set_title('Yearly Salary')
 
-        st.markdown('### 동종업계')
-        df = data.get_data()
-        st.dataframe(df.loc[df['업종코드'] == info['업종코드'], ['사업장명', '월급여추정', '연간급여추정', '가입자수']]\
-            .sort_values('연간급여추정', ascending=False).head(10).round(0), 
-            use_container_width=True
-        )
-        
-    else:
-        st.subheader('검색결과가 없습니다')
+            ax[0].tick_params(axis='both', which='major', labelsize=8, rotation=0)
+            ax[0].tick_params(axis='both', which='minor', labelsize=6)
+            ax[1].tick_params(axis='both', which='major', labelsize=8)
+            ax[1].tick_params(axis='both', which='minor', labelsize=6)
+
+            st.pyplot(fig)
+
+            st.markdown('### 동종업계')
+            df = data.get_data()
+            st.dataframe(df.loc[df['업종코드'] == info['업종코드'], ['사업장명', '월급여추정', '연간급여추정', '가입자수']]\
+                .sort_values('연간급여추정', ascending=False).head(10).round(0), 
+                use_container_width=True
+            )
+            
+        else:
+            st.subheader('검색결과가 없습니다')
+else:
+    st.info('먼저 CSV파일을 업로드해주세요')
