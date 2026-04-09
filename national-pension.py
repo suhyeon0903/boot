@@ -71,9 +71,13 @@ class PensionData():
     def get_data(self):
         return self.df
 
-@ st.cache_data
+@st.cache_data
 def read_pensiondata():
-    data = PensionData('./data/national-pension.csv')
+    import gdown
+    file_id = "10oNjHF87Ky1A-1k2f-jk3RIuVckpDRLi"
+    url = f"https://drive.google.com/uc?id={file_id}"
+    gdown.download(url, "national-pension.csv", quiet=False)
+    data = PensionData("national-pension.csv")
     return data
 
 data = read_pensiondata()
